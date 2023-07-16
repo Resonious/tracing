@@ -23,6 +23,9 @@ use tracing_serde::AsSerde;
 #[cfg(feature = "tracing-log")]
 use tracing_log::NormalizeEvent;
 
+#[cfg(feature = "opentelemetry")]
+use tracing_opentelemetry::OtelData;
+
 /// Marker for [`Format`] that indicates that the newline-delimited JSON log
 /// format should be used.
 ///
@@ -319,6 +322,17 @@ where
             if self.display_thread_id {
                 serializer
                     .serialize_entry("threadId", &format!("{:?}", std::thread::current().id()))?;
+            }
+
+            #[cfg(feature = "opentelemetry")]
+            if let Some(ref span) = current_span {
+                if let Some(otel_data) = span.extensions().get::<OtelData>() {
+                    let trace_id = otel_data.builder.trace_id.map(|id| id.to_string());
+                    let span_id = otel_data.builder.span_id.map(|id| id.to_string());
+
+                    serializer.serialize_entry("trace_id", &trace_id)?;
+                    serializer.serialize_entry("span_id", &span_id)?;
+                }
             }
 
             serializer.end()
